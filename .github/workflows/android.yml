@@ -1,10 +1,9 @@
 name: Build Android APK
 
-'on':
+on:
 workflow_dispatch:
 push:
-branches:
-- main
+branches: [main]
 
 jobs:
 build:
@@ -39,7 +38,6 @@ steps:
 
       if [ -z "$GRADLE_FILE" ]; then
         echo "ERROR: app/build.gradle.kts was not found."
-        echo "Files found:"
         find /tmp/proj -maxdepth 6 -type f | head -200
         exit 1
       fi
@@ -47,8 +45,8 @@ steps:
       PROJECT_DIR=$(dirname "$(dirname "$GRADLE_FILE")")
 
       if [ ! -f "$PROJECT_DIR/settings.gradle.kts" ] && [ ! -f "$PROJECT_DIR/settings.gradle" ]; then
-        echo "ERROR: Gradle settings file was not found in $PROJECT_DIR"
-        find /tmp/proj -maxdepth 5 -type f \( -name 'settings.gradle' -o -name 'settings.gradle.kts' \)
+        echo "ERROR: Gradle settings file was not found."
+        find /tmp/proj -maxdepth 6 -type f \( -name 'settings.gradle' -o -name 'settings.gradle.kts' \)
         exit 1
       fi
 
