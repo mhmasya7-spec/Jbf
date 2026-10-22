@@ -1,0 +1,85 @@
+name: Build Android APK
+
+'on':
+workflow_dispatch:
+push:
+branches:
+- main
+
+jobs:
+build:
+runs-on: ubuntu-24.04
+
+steps:
+  - name: Checkout repository
+    uses: actions/checkout@v4
+
+  - name: Unzip project
+    shell: bash
+    run: |
+      set -e
+      mkdir -p /tmp/proj
+
+      ZIP=$(find "$GITHUB_WORKSPACE" -type f -iname '*PlateHunter*.zip' -print -quit)
+
+      if [ -n "$ZIP" ]; then
+        echo "Found ZIP: $ZIP"
+        unzip -oq "$ZIP" -d /tmp/proj
+      else
+        echo "No PlateHunter ZIP found; using repository files."
+        cp -a "$GITHUB_WORKSPACE/." /tmp/proj/
+      fi
+
+  - name: Locate Android project
+    shell: bash
+    run: |
+      set -e
+
+      GRADLE_FILE=$(find /tmp/proj -type f -path '*/app/build.gradle.kts' -print -quit)
+
+      if [ -z "$GRADLE_FILE" ]; then
+        echo "ERROR: app/build.gradle.kts was not found."
+        echo "Files found:"
+        find /tmp/proj -maxdepth 6 -type f | head -200
+        exit 1
+      fi
+
+      PROJECT_DIR=$(dirname "$(dirname "$GRADLE_FILE")")
+
+      if [ ! -f "$PROJECT_DIR/settings.gradle.kts" ] && [ ! -f "$PROJECT_DIR/settings.gradle" ]; then
+        echo "ERROR: Gradle settings file was not found in $PROJECT_DIR"
+        find /tmp/proj -maxdepth 5 -type f \( -name 'settings.gradle' -o -name 'settings.gradle.kts' \)
+        exit 1
+      fi
+
+      echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+      echo "Found project: $PROJECT_DIR"
+
+  - name: Set up Java
+    uses: actions/setup-java@v4
+    with:
+      distribution: temurin
+      java-version: '17'
+
+  - name: Set up Android SDK
+    uses: android-actions/setup-android@v3
+
+  - name: Install Android SDK packages
+    run: |
+      sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+  - name: Set up Gradle
+    uses: gradle/actions/setup-gradle@v4
+    with:
+      gradle-version: '8.9'
+
+  - name: Build debug APK
+    working-directory: ${{ env.PROJECT_DIR }}
+    run: gradle --no-daemon assembleDebug
+
+  - name: Upload APK
+    uses: actions/upload-artifact@v4
+    with:
+      name: PlateHunter-debug-apk
+      path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk
+      if-no-files-found: error
